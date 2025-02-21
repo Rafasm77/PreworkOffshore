@@ -1,0 +1,19 @@
+Como Executar
+
+!! - Necessário ter o Python instalado na máquina.
+
+1 - Acesse a pasta PreworkOffshore
+2 - Clique com o botão já dentro dela em "Abrir terminal"
+3 - Instale as dependências usando o comando: 
+
+pip install -r requirements.txt
+
+ Observação: é necessário que o arquivo requirements esteja na mesma pasta do arquivo a executar
+
+4 - Execute o aplicativo com
+
+ python -m streamlit run main.py
+
+ou 
+
+ streamlit run main.py
