@@ -107,12 +107,15 @@ if len(hist) > 0:
 else:
     st.warning("Nenhum dado histórico disponível para o ativo selecionado. Verifique gráfico Trading View abaixo.")
 
-# Gráfico de preços históricos
-st.subheader("Histórico de Preços")
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], name='Preço Fechamento'))  # Preço de fechamento da ação
-fig.update_layout(height=400, showlegend=True)
-st.plotly_chart(fig, use_container_width=True)
+# HTML do widget de gráfico do TradingView
+tradingview_widget = f"""
+<iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_c3f01&symbol={ticker_code}&interval=D&theme=dark"
+    width="100%" height="500" frameborder="0" allowtransparency="true"></iframe>
+"""
+
+st.title("Gráfico do TradingView")
+st.markdown(f"### Acompanhamento do Ativo {ticker_code}")
+st.components.v1.html(tradingview_widget, height=500)
 
 # Layout Informações Fundamentais + Volume Anormal
 col1, col2 = st.columns([1, 1.1])
@@ -150,15 +153,12 @@ with col2:
     )
     st.plotly_chart(fig_volume, use_container_width=False)
 
-# HTML do widget de gráfico do TradingView
-tradingview_widget = f"""
-<iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_c3f01&symbol={ticker_code}&interval=D&theme=dark"
-    width="100%" height="500" frameborder="0" allowtransparency="true"></iframe>
-"""
-
-st.title("Gráfico do TradingView")
-st.markdown(f"### Acompanhamento do Ativo {ticker_code}")
-st.components.v1.html(tradingview_widget, height=500)
+# Gráfico de preços históricos
+st.subheader("Histórico de Preços")
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], name='Preço Fechamento'))  # Preço de fechamento da ação
+fig.update_layout(height=400, showlegend=True)
+st.plotly_chart(fig, use_container_width=True)
 
 # Seção de Notícias (quando disponível)
 try:
