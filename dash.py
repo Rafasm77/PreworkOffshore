@@ -6,7 +6,8 @@ import ta
 import re
 import numpy as np
 import json
-import runpy
+import plotly.express as px
+from datetime import datetime
 
 # Configurar a página
 st.set_page_config(page_title="Análise de Ações B3", layout="wide")
@@ -68,6 +69,8 @@ header_text = f"Análise do ativo: {TICKERS[selected_ticker]} ({selected_ticker}
 # Conteúdo principal
 st.header(header_text)
 
+st.markdown("---")  
+
 # Expressão regular para capturar o conteúdo dentro dos parênteses
 match = re.search(r"\((.*?)\)", header_text)
 
@@ -111,6 +114,8 @@ if len(hist) > 0:
 else:
     st.warning("Nenhum dado histórico disponível para o ativo selecionado. Verifique gráfico Trading View abaixo.")
 
+st.markdown("---")  
+
 # HTML do widget de gráfico do TradingView
 tradingview_widget = f"""
 <iframe src="https://s.tradingview.com/widgetembed/?frameElementId=tradingview_c3f01&symbol={ticker_code}&interval=D&theme=dark"
@@ -118,6 +123,8 @@ tradingview_widget = f"""
 """
 
 st.components.v1.html(tradingview_widget, height=500)
+
+st.markdown("---")      
 
 # Layout Informações Fundamentais + Volume Anormal
 col1, col2 = st.columns([1, 1.1])
@@ -148,8 +155,6 @@ with col2:
 
     # Ajuste do tamanho do gráfico
     fig_volume.update_layout(
-        height=300,
-        width=600,
         showlegend=True
     )
     st.plotly_chart(fig_volume, use_container_width=False)
@@ -179,12 +184,109 @@ if ev_ebitda is not None:
 else:
     st.write(f" ")
 
+st.markdown("---")  
 
-# Gráfico de preços históricos
-st.subheader("Histórico de Preços")
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], name='Preço Fechamento'))  # Preço de fechamento da ação
-fig.update_layout(height=400, showlegend=True)
-st.plotly_chart(fig, use_container_width=True)
+# Layout Earnings Date + Gráfico Earnings
+col1, col2 = st.columns([1, 1.1])
+
+# Função para buscar os dados de Earnings
+def get_earnings_data(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        earnings_df = stock.earnings_dates  # Já retorna um DataFrame
+
+        # Verificar se há dados disponíveis
+        if earnings_df is None or earnings_df.empty:
+            return None, None
+
+        # Resetar índice para transformar a data em uma coluna
+        earnings_df = earnings_df.reset_index()
+
+        # Renomear colunas para melhor visualização
+        earnings_df = earnings_df.rename(columns={
+            "Earnings Date": "Earnings Date",
+            "EPS Estimate": "EPS Estimate",
+            "Reported EPS": "Reported EPS",
+            "Surprise(%)": "Surprise (%)"
+        })
+
+        # Converter a coluna de data para datetime e remover fuso horário
+        earnings_df["Earnings Date"] = pd.to_datetime(earnings_df["Earnings Date"]).dt.tz_localize(None)
+
+        # Adicionar colunas ausentes com valores "None"
+        required_columns = ["Earnings Date", "EPS Estimate", "Reported EPS", "Surprise (%)"]
+        for col in required_columns:
+            if col not in earnings_df.columns:
+                earnings_df[col] = None
+
+        # Separar earnings passados e futuros
+        today = datetime.today()
+        past_earnings = earnings_df[earnings_df["Earnings Date"] < today]
+        future_earnings = earnings_df[earnings_df["Earnings Date"] >= today][["Earnings Date", "EPS Estimate"]]
+
+        return past_earnings, future_earnings
+
+    except Exception as e:
+        st.error(f"Erro ao buscar os dados: {e}")
+        return None, None
+
+if selected_ticker:
+    past_earnings, future_earnings = get_earnings_data(selected_ticker)
+
+    with col1:
+        if isinstance(past_earnings, pd.DataFrame) and not past_earnings.empty:
+            st.subheader(f"Earnings Passados para {selected_ticker}")
+            st.dataframe(past_earnings)
+        else:
+            st.warning("Nenhuma informação encontrada para earnings passados.")
+
+    with col2:
+        if isinstance(past_earnings, pd.DataFrame) and not past_earnings.empty:
+            st.subheader(f"Comparação de EPS - {selected_ticker}")
+            # Criando um gráfico interativo
+            fig = px.line(
+                past_earnings.dropna(subset=["Earnings Date"]),  # Remover linhas sem data
+                x="Earnings Date", 
+                y=["EPS Estimate", "Reported EPS"], 
+                markers=True,
+                labels={"value": "EPS", "variable": "Tipo"}
+            )
+
+            # Adicionar barras de Surpresa (%) no gráfico, tratando valores "None"
+            if past_earnings["Surprise (%)"].notna().any():
+                fig.add_bar(
+                    x=past_earnings["Earnings Date"], 
+                    y=past_earnings["Surprise (%)"].fillna(0),  # Substituir None por 0 no gráfico
+                    name="Surprise (%)"
+                )
+
+            # Exibir o gráfico
+            st.plotly_chart(fig)
+        else:
+            st.warning("Nenhum dado disponível para gerar o gráfico.")
+
+st.markdown("---") 
+
+# Layout Earnings Futuros + Gráfico Preços Históricos
+col1, col2 = st.columns([1, 1.1])
+
+with col1:
+
+    # Earnings Futuros
+     
+    if isinstance(future_earnings, pd.DataFrame) and not future_earnings.empty:
+        st.subheader(f"Próximos Earnings para {selected_ticker}")
+        st.dataframe(future_earnings)
+    else:
+        st.warning("Nenhum earnings futuro encontrado.")
+
+with col2:
+
+    # Gráfico de preços históricos  
+    st.subheader("Histórico de Preços")
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=hist.index, y=hist['Close'], name='Preço Fechamento'))  # Preço de fechamento da ação
+    fig.update_layout(height=400, showlegend=True)
+    st.plotly_chart(fig, use_container_width=True)
 
 
